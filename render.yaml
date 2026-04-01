@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: jobhunt-control-room
+    runtime: docker
+    plan: starter
+    region: oregon
+    numInstances: 1
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    disk:
+      name: jobhunt-storage
+      mountPath: /app/storage
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: "3000"
+      - key: STORAGE_ROOT
+        value: /app/storage

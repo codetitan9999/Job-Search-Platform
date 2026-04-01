@@ -1,0 +1,10 @@
+.git
+.gitignore
+README.md
+data/*
+!data/.gitkeep
+uploads/*
+!uploads/.gitkeep
+node_modules
+npm-debug.log*
+.DS_Store

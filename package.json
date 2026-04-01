@@ -1,0 +1,9 @@
+{
+  "name": "jobhunt-control-room",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local UI, API, and scheduler for a resume-aware company portal job search.",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JobHunt Control Room</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <div class="page-glow page-glow-left"></div>
+    <div class="page-glow page-glow-right"></div>
+
+    <div class="shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Resume-aware career portal scout</p>
+          <h1>Configure the search once. Launch it on demand or every hour.</h1>
+          <p class="hero-text">
+            This UI captures everything needed for a high-signal job search:
+            resume, role targeting, company portals, search filters,
+            notifications, and the hourly run schedule.
+          </p>
+
+          <div class="hero-stats">
+            <article class="stat-card">
+              <span class="stat-value">1 click</span>
+              <span class="stat-label">run-now trigger</span>
+            </article>
+            <article class="stat-card">
+              <span class="stat-value">1 hour</span>
+              <span class="stat-label">automation cadence</span>
+            </article>
+            <article class="stat-card">
+              <span class="stat-value">Resume</span>
+              <span class="stat-label">match scoring input</span>
+            </article>
+          </div>
+        </div>
+
+        <div class="hero-panel">
+          <div class="hero-panel-header">
+            <span class="panel-kicker">System posture</span>
+            <span id="status-pill" class="status-pill">Drafting search profile</span>
+          </div>
+
+          <dl class="status-grid">
+            <div>
+              <dt>Targeting</dt>
+              <dd id="quick-role-count">0 roles</dd>
+            </div>
+            <div>
+              <dt>Company sweep</dt>
+              <dd id="quick-company-count">0 portals</dd>
+            </div>
+            <div>
+              <dt>Delivery</dt>
+              <dd id="quick-notification-count">Dashboard only</dd>
+            </div>
+            <div>
+              <dt>Schedule</dt>
+              <dd id="quick-schedule">Manual run</dd>
+            </div>
+          </dl>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <form id="job-search-form" class="config-form">
+          <section class="panel">
+            <div class="section-heading">
+              <p class="section-index">01</p>
+              <div>
+                <h2>Candidate Profile</h2>
+                <p>Attach the resume and baseline profile used for matching.</p>
+              </div>
+            </div>
+
+            <div class="input-grid">
+              <label class="field field-wide resume-field">
+                <span>Resume</span>
+                <input id="resume" name="resume" type="file" accept=".pdf,.doc,.docx" />
+                <span id="resume-dropzone" class="resume-dropzone">
+                  <strong>Upload your resume</strong>
+                  <small>PDF or Word file. This will be used for fit scoring.</small>
+                </span>
+              </label>
+
+              <label class="field">
+                <span>Experience level</span>
+                <select id="experienceLevel" name="experienceLevel">
+                  <option value="">Select level</option>
+                  <option>Internship</option>
+                  <option>Entry level</option>
+                  <option>Associate</option>
+                  <option>Mid level</option>
+                  <option>Senior</option>
+                  <option>Lead</option>
+                  <option>Manager</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Preferred tech stack</span>
+                <input
+                  id="preferredTechStack"
+                  name="preferredTechStack"
+                  type="text"
+                  placeholder="Example: React, Node.js, Python, AWS"
+                />
+              </label>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-heading">
+              <p class="section-index">02</p>
+              <div>
+                <h2>Role Targeting</h2>
+                <p>Define what to chase aggressively and what to filter out.</p>
+              </div>
+            </div>
+
+            <div class="input-grid">
+              <label class="field field-wide">
+                <span>Target roles</span>
+                <textarea
+                  id="targetRoles"
+                  name="targetRoles"
+                  rows="4"
+                  placeholder="Senior Frontend Engineer, Full Stack Engineer, Software Engineer II"
+                ></textarea>
+                <small>Separate items with commas or new lines.</small>
+              </label>
+
+              <label class="field field-wide">
+                <span>Exclude roles</span>
+                <textarea
+                  id="excludeRoles"
+                  name="excludeRoles"
+                  rows="3"
+                  placeholder="Staff Engineer, QA Engineer, Sales Engineer"
+                ></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-heading">
+              <p class="section-index">03</p>
+              <div>
+                <h2>Company Sweep</h2>
+                <p>List the companies and tell the system whether logins are allowed.</p>
+              </div>
+            </div>
+
+            <div class="input-grid">
+              <label class="field field-wide">
+                <span>Companies</span>
+                <textarea
+                  id="companies"
+                  name="companies"
+                  rows="5"
+                  placeholder="Google, Stripe, Airbnb, Datadog"
+                ></textarea>
+                <small>Enter the company names whose career portals should be scanned.</small>
+              </label>
+
+              <fieldset class="field field-wide option-group">
+                <legend>Portal access</legend>
+                <label class="choice-card">
+                  <input type="radio" name="portalAccess" value="Public portals only" checked />
+                  <span>
+                    <strong>Public portals only</strong>
+                    <small>Safer V1. No credentials required.</small>
+                  </span>
+                </label>
+
+                <label class="choice-card">
+                  <input type="radio" name="portalAccess" value="Public and login-required portals" />
+                  <span>
+                    <strong>Public and login-required</strong>
+                    <small>Include portals that need credentials later.</small>
+                  </span>
+                </label>
+              </fieldset>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-heading">
+              <p class="section-index">04</p>
+              <div>
+                <h2>Search Filters</h2>
+                <p>Control where and how the search should narrow results.</p>
+              </div>
+            </div>
+
+            <div class="input-grid">
+              <label class="field">
+                <span>Locations</span>
+                <textarea
+                  id="locations"
+                  name="locations"
+                  rows="4"
+                  placeholder="San Francisco, New York, Remote - US"
+                ></textarea>
+              </label>
+
+              <fieldset class="field option-group">
+                <legend>Work type</legend>
+                <label class="toggle">
+                  <input type="checkbox" name="workType" value="Remote" />
+                  <span>Remote</span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" name="workType" value="Hybrid" />
+                  <span>Hybrid</span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" name="workType" value="Onsite" />
+                  <span>Onsite</span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" name="workType" value="Contract" />
+                  <span>Contract</span>
+                </label>
+              </fieldset>
+
+              <label class="field field-wide">
+                <span>Other filters</span>
+                <textarea
+                  id="otherFilters"
+                  name="otherFilters"
+                  rows="4"
+                  placeholder="Visa sponsorship, salary above 150k, posted in last 7 days, no security clearance"
+                ></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="section-heading">
+              <p class="section-index">05</p>
+              <div>
+                <h2>Automation And Notifications</h2>
+                <p>Decide how the search runs and where new matches should arrive.</p>
+              </div>
+            </div>
+
+            <div class="input-grid">
+              <fieldset class="field option-group">
+                <legend>Notification method</legend>
+                <label class="toggle">
+                  <input type="checkbox" name="notificationMethod" value="Dashboard" checked />
+                  <span>Dashboard</span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" name="notificationMethod" value="Email" />
+                  <span>Email</span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" name="notificationMethod" value="Slack" />
+                  <span>Slack</span>
+                </label>
+                <label class="toggle">
+                  <input type="checkbox" name="notificationMethod" value="Telegram" />
+                  <span>Telegram</span>
+                </label>
+              </fieldset>
+
+              <label class="field">
+                <span>Notification destination</span>
+                <textarea
+                  id="notificationDestination"
+                  name="notificationDestination"
+                  rows="4"
+                  placeholder="email@domain.com, Slack webhook, Telegram chat id"
+                ></textarea>
+              </label>
+
+              <fieldset class="field option-group">
+                <legend>Run schedule</legend>
+                <label class="toggle schedule-toggle">
+                  <input id="autoRun" type="checkbox" name="autoRun" checked />
+                  <span>Run automatically</span>
+                </label>
+
+                <label class="field-inline">
+                  <span>Interval</span>
+                  <select id="runIntervalHours" name="runIntervalHours">
+                    <option value="1" selected>Every 1 hour</option>
+                    <option value="2">Every 2 hours</option>
+                    <option value="4">Every 4 hours</option>
+                    <option value="8">Every 8 hours</option>
+                  </select>
+                </label>
+
+                <label class="field-inline">
+                  <span>Timezone</span>
+                  <input id="timezone" name="timezone" type="text" readonly />
+                </label>
+              </fieldset>
+            </div>
+          </section>
+        </form>
+
+        <aside class="summary-rail">
+          <section class="panel summary-panel">
+            <div class="summary-header">
+              <div>
+                <p class="eyebrow">Live search brief</p>
+                <h2>Configuration Review</h2>
+              </div>
+              <span id="last-saved" class="summary-timestamp">Not saved yet</span>
+            </div>
+
+            <div class="summary-block">
+              <h3>Target roles</h3>
+              <div id="role-chip-list" class="chip-list empty-state">
+                Add target roles to see them here.
+              </div>
+            </div>
+
+            <div class="summary-block">
+              <h3>Company sweep</h3>
+              <div id="company-chip-list" class="chip-list empty-state">
+                Add companies to build the portal scan list.
+              </div>
+            </div>
+
+            <div class="summary-block">
+              <h3>Delivery</h3>
+              <div id="notification-chip-list" class="chip-list"></div>
+            </div>
+
+            <div class="summary-block checklist">
+              <div>
+                <span>Resume attached</span>
+                <strong id="resume-status">Missing</strong>
+              </div>
+              <div>
+                <span>Automation cadence</span>
+                <strong id="schedule-status">Every 1 hour</strong>
+              </div>
+              <div>
+                <span>Portal access mode</span>
+                <strong id="portal-status">Public portals only</strong>
+              </div>
+              <div>
+                <span>Backend</span>
+                <strong id="backend-status">Connecting</strong>
+              </div>
+              <div>
+                <span>Last run</span>
+                <strong id="last-run-status">No runs yet</strong>
+              </div>
+              <div>
+                <span>Next automatic run</span>
+                <strong id="next-run-status">Not scheduled</strong>
+              </div>
+            </div>
+
+            <div class="action-bar">
+              <button id="save-config" class="button button-secondary" type="button">
+                Save profile
+              </button>
+              <button id="run-preview" class="button button-primary" type="button">
+                Run search
+              </button>
+            </div>
+
+            <div id="action-feedback" class="feedback">
+              Search profile is in draft mode. Save it once the essentials are filled.
+            </div>
+          </section>
+
+          <section class="panel preview-panel">
+            <div class="summary-header">
+              <div>
+                <p class="eyebrow">Payload preview</p>
+                <h2>Search Config JSON</h2>
+              </div>
+            </div>
+            <pre id="config-preview" class="config-preview"></pre>
+          </section>
+
+          <section class="panel run-panel">
+            <div class="summary-header">
+              <div>
+                <p class="eyebrow">Execution log</p>
+                <h2>Recent Runs</h2>
+              </div>
+              <span id="scheduler-state" class="summary-timestamp">Waiting for backend</span>
+            </div>
+            <div id="run-list" class="run-list empty-state">
+              No runs yet. Save a profile and trigger the first scan.
+            </div>
+          </section>
+        </aside>
+      </main>
+    </div>
+  </body>
+</html>
