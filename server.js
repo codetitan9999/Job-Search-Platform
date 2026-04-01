@@ -127,19 +127,30 @@ function buildBootstrap() {
   const runs = loadRunHistory();
 
   return {
+    deploymentMode: "persistent",
     config: loadConfig(),
     runs,
     status: buildStatus(runs),
   };
 }
 
-async function runSearch(trigger = "manual") {
+async function runSearch(trigger = "manual", profileOverride = null) {
   if (activeRunPromise) {
     return activeRunPromise;
   }
 
   activeRunPromise = (async () => {
-    const profile = loadConfig();
+    const baseProfile = loadConfig();
+    const profile = profileOverride
+      ? normalizeSearchProfile(
+          {
+            ...baseProfile,
+            ...profileOverride,
+            updatedAt: new Date().toISOString(),
+          },
+          baseProfile,
+        )
+      : baseProfile;
     const issues = validateSearchProfile(profile);
 
     if (issues.length) {
@@ -209,6 +220,7 @@ async function handleConfigSave(request, response) {
   await scheduler.inspect();
 
   sendJson(response, 200, {
+    deploymentMode: "persistent",
     config: nextProfile,
     status: buildStatus(),
   });
@@ -216,7 +228,10 @@ async function handleConfigSave(request, response) {
 
 async function handleApi(request, response, pathname) {
   if (request.method === "GET" && pathname === "/api/healthz") {
-    sendJson(response, 200, { ok: true });
+    sendJson(response, 200, {
+      ok: true,
+      deploymentMode: "persistent",
+    });
     return;
   }
 
@@ -226,17 +241,26 @@ async function handleApi(request, response, pathname) {
   }
 
   if (request.method === "GET" && pathname === "/api/config") {
-    sendJson(response, 200, { config: loadConfig() });
+    sendJson(response, 200, {
+      deploymentMode: "persistent",
+      config: loadConfig(),
+    });
     return;
   }
 
   if (request.method === "GET" && pathname === "/api/runs") {
-    sendJson(response, 200, { runs: loadRunHistory() });
+    sendJson(response, 200, {
+      deploymentMode: "persistent",
+      runs: loadRunHistory(),
+    });
     return;
   }
 
   if (request.method === "GET" && pathname === "/api/status") {
-    sendJson(response, 200, { status: buildStatus() });
+    sendJson(response, 200, {
+      deploymentMode: "persistent",
+      status: buildStatus(),
+    });
     return;
   }
 
@@ -246,9 +270,11 @@ async function handleApi(request, response, pathname) {
   }
 
   if (request.method === "POST" && pathname === "/api/run") {
-    const run = await runSearch("manual");
+    const body = await readJsonRequest(request);
+    const run = await runSearch("manual", body.config || null);
     await scheduler.inspect();
     sendJson(response, 200, {
+      deploymentMode: "persistent",
       run,
       runs: loadRunHistory(),
       status: buildStatus(),

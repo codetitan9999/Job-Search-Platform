@@ -28,29 +28,38 @@ Then open `http://127.0.0.1:3000`.
 
 ## Deploy it
 
-This repo is now prepared for container deployment:
+This repo now supports two deployment modes:
 
-- `Dockerfile` builds the app as a single Node container.
-- `render.yaml` provisions a single Render web service with a persistent disk.
-- `HOST`, `PORT`, and `STORAGE_ROOT` are configurable through environment variables.
+### Free manual-run deployment
 
-Recommended deployment target: Render web service with a persistent disk.
+Use Vercel with:
 
-Why this fits the current architecture:
+- `vercel.json`
+- `api/` serverless functions
+- browser-local draft storage
+- manual `Run search` only
 
-- The app uses an in-process hourly scheduler, so it needs an always-on service.
-- Search profiles, run history, and uploaded resumes are stored on disk, so it needs persistent storage.
-- The current architecture should run as a single instance because the scheduler and local disk are instance-local.
+This is the best free option if we are temporarily ignoring the hourly scheduler.
 
-Render setup:
+### Persistent deployment
 
-1. Push this repo to GitHub.
-2. In Render, create a Blueprint or Web Service from the repo.
-3. Keep `render.yaml` as the source of truth.
-4. Make sure the persistent disk is mounted at `/app/storage`.
-5. After deploy, the service health check should pass on `/healthz`.
+Use Render with:
 
-Local Docker run:
+- `Dockerfile`
+- `render.yaml`
+- persistent disk mounted at `/app/storage`
+
+This is the better fit when we bring back the hourly scheduler and server-side storage.
+
+## Free deployment notes
+
+The Vercel path is intentionally manual-run only:
+
+- no hourly scheduler
+- no server-side disk persistence
+- search profile drafts and recent runs are kept in the browser
+
+## Local Docker run
 
 ```bash
 docker build -t jobhunt-control-room .
@@ -59,7 +68,7 @@ docker run -p 3000:3000 -e STORAGE_ROOT=/app/storage jobhunt-control-room
 
 ## Current limitation
 
-The backend infrastructure is now wired, but live job retrieval is still scaffolded. Each run records execution history and produces connector reports that show which companies still need real career-portal adapters.
+The deployment paths are wired, but live job retrieval is still scaffolded. Each run records execution history and produces connector reports that show which companies still need real career-portal adapters.
 
 ## Next steps
 

@@ -1,6 +1,51 @@
 # Deployment Runbook
 
-This app is set up to deploy as a single Docker-based web service on Render with a persistent disk.
+This app supports two deployment modes:
+
+- Free manual-run deployment on Vercel
+- Persistent scheduled deployment on Render
+
+## Free path: Vercel
+
+Use this if we are temporarily ignoring scheduled runs.
+
+### What changes in this mode
+
+- The app runs in manual mode only.
+- The scheduler is disabled.
+- Draft profiles and recent runs are stored in the browser, not on the server.
+- The API is served from `api/` serverless functions.
+
+### Files already prepared
+
+- `vercel.json`
+- `api/`
+
+### Vercel steps
+
+1. Push the repo to GitHub.
+2. Sign in to Vercel.
+3. Create a new project from the GitHub repository.
+4. Keep the default framework setting as `Other`.
+5. Deploy.
+
+### Verify
+
+After deploy, open:
+
+```text
+https://<your-vercel-domain>/api/healthz
+```
+
+Then open:
+
+```text
+https://<your-vercel-domain>/
+```
+
+## Persistent path: Render
+
+Use this when we want the scheduler and server-side persistence back.
 
 ## Why Render
 

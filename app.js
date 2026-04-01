@@ -1,8 +1,13 @@
+const DRAFT_STORAGE_KEY = "jobhunt-control-room:draft:v2";
+const RUNS_STORAGE_KEY = "jobhunt-control-room:runs:v2";
+
 const form = document.getElementById("job-search-form");
 const preview = document.getElementById("config-preview");
 const resumeInput = document.getElementById("resume");
 const resumeDropzone = document.getElementById("resume-dropzone");
 const timezoneInput = document.getElementById("timezone");
+const autoRunInput = document.getElementById("autoRun");
+const runIntervalInput = document.getElementById("runIntervalHours");
 const statusPill = document.getElementById("status-pill");
 const lastSaved = document.getElementById("last-saved");
 const feedback = document.getElementById("action-feedback");
@@ -33,6 +38,7 @@ const state = {
   status: null,
   runs: [],
   busy: false,
+  deploymentMode: "persistent",
 };
 
 function splitEntries(value) {
@@ -56,9 +62,58 @@ function getResumeFileName() {
   return resumeInput.files[0]?.name || resumeInput.dataset.fileName || "";
 }
 
+function readLocalJson(key, fallback) {
+  try {
+    const value = localStorage.getItem(key);
+    return value ? JSON.parse(value) : fallback;
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function writeLocalJson(key, payload) {
+  try {
+    localStorage.setItem(key, JSON.stringify(payload));
+  } catch (error) {
+    return;
+  }
+}
+
+function loadLocalDraft() {
+  return readLocalJson(DRAFT_STORAGE_KEY, null);
+}
+
+function persistLocalDraft(config) {
+  writeLocalJson(DRAFT_STORAGE_KEY, config);
+}
+
+function loadLocalRuns() {
+  const runs = readLocalJson(RUNS_STORAGE_KEY, []);
+  return Array.isArray(runs) ? runs : [];
+}
+
+function persistLocalRuns(runs) {
+  writeLocalJson(RUNS_STORAGE_KEY, Array.isArray(runs) ? runs.slice(0, 10) : []);
+}
+
+function chooseNewestConfig(serverConfig, localConfig) {
+  if (!localConfig) {
+    return serverConfig;
+  }
+
+  if (!serverConfig) {
+    return localConfig;
+  }
+
+  const serverUpdatedAt = new Date(serverConfig.updatedAt || 0).getTime();
+  const localUpdatedAt = new Date(localConfig.updatedAt || 0).getTime();
+
+  return localUpdatedAt > serverUpdatedAt ? localConfig : serverConfig;
+}
+
 function getConfiguration() {
-  const autoRun = document.getElementById("autoRun").checked;
-  const interval = document.getElementById("runIntervalHours").value;
+  const autoRun = state.deploymentMode === "manual-only" ? false : autoRunInput.checked;
+  const interval = runIntervalInput.value;
 
   return {
     resumeFileName: getResumeFileName(),
@@ -80,6 +135,19 @@ function getConfiguration() {
   };
 }
 
+function applyDeploymentMode(mode) {
+  state.deploymentMode = mode || "persistent";
+  const manualOnly = state.deploymentMode === "manual-only";
+
+  autoRunInput.disabled = manualOnly;
+  runIntervalInput.disabled = manualOnly;
+
+  if (manualOnly) {
+    autoRunInput.checked = false;
+    runIntervalInput.value = "1";
+  }
+}
+
 function applyConfiguration(config) {
   document.getElementById("targetRoles").value = (config.targetRoles || []).join(", ");
   document.getElementById("excludeRoles").value = (config.excludeRoles || []).join(", ");
@@ -89,8 +157,8 @@ function applyConfiguration(config) {
   document.getElementById("preferredTechStack").value = config.preferredTechStack || "";
   document.getElementById("otherFilters").value = (config.otherFilters || []).join(", ");
   document.getElementById("notificationDestination").value = config.notificationDestination || "";
-  document.getElementById("autoRun").checked = Boolean(config.autoRun);
-  document.getElementById("runIntervalHours").value = String(config.runIntervalHours || 1);
+  autoRunInput.checked = Boolean(config.autoRun);
+  runIntervalInput.value = String(config.runIntervalHours || 1);
   timezoneInput.value = config.timezone || timezoneInput.value;
 
   Array.from(document.querySelectorAll('input[name="workType"]')).forEach((input) => {
@@ -104,6 +172,10 @@ function applyConfiguration(config) {
   Array.from(document.querySelectorAll('input[name="portalAccess"]')).forEach((input) => {
     input.checked = input.value === config.portalAccess;
   });
+
+  if (state.deploymentMode === "manual-only") {
+    autoRunInput.checked = false;
+  }
 
   resumeInput.value = "";
   resumeInput.dataset.fileName = config.resumeFileName || "";
@@ -138,9 +210,13 @@ function describeSchedule(autoRun, interval) {
 
 function updateResumeDisplay(fileName) {
   if (fileName) {
-    const helperText = resumeInput.files[0]
-      ? "Selected locally. Save profile to upload this version."
-      : "Resume stored on the server for fit scoring.";
+    let helperText = "Resume ready for fit scoring.";
+
+    if (resumeInput.files[0]) {
+      helperText = "Selected locally. Save or run to use this version.";
+    } else if (state.deploymentMode === "manual-only") {
+      helperText = "Resume name saved in this browser. Re-upload after refresh if needed.";
+    }
 
     resumeDropzone.innerHTML = `<strong>${fileName}</strong><small>${helperText}</small>`;
     resumeStatus.textContent = "Attached";
@@ -176,7 +252,6 @@ function renderConfiguration(config) {
   quickSchedule.textContent = scheduleText;
   scheduleStatus.textContent = scheduleText;
   portalStatus.textContent = config.portalAccess;
-
   preview.textContent = JSON.stringify(config, null, 2);
 }
 
@@ -262,13 +337,16 @@ function validateConfiguration(config) {
 function renderStatus(status) {
   const latestRun = status?.latestRun || state.runs[0] || null;
   const scheduler = status?.scheduler || {};
+  const manualOnly = state.deploymentMode === "manual-only";
 
   backendStatus.textContent = status?.backend === "online" ? "Online" : "Offline";
   lastRunStatus.textContent = latestRun ? formatTimestamp(latestRun.startedAt) : "No runs yet";
   nextRunStatus.textContent = scheduler.nextRunAt ? formatTimestamp(scheduler.nextRunAt) : "Not scheduled";
-  schedulerState.textContent = scheduler.enabled
-    ? `Auto-run every ${scheduler.intervalHours} hour${scheduler.intervalHours === 1 ? "" : "s"}`
-    : "Manual run mode";
+  schedulerState.textContent = manualOnly
+    ? "Manual run mode (free deployment)"
+    : scheduler.enabled
+      ? `Auto-run every ${scheduler.intervalHours} hour${scheduler.intervalHours === 1 ? "" : "s"}`
+      : "Manual run mode";
 
   if (!status || status.backend !== "online") {
     statusPill.textContent = "Backend offline";
@@ -280,7 +358,11 @@ function renderStatus(status) {
     return;
   }
 
-  statusPill.textContent = scheduler.enabled ? "Hourly automation armed" : "Manual run mode";
+  statusPill.textContent = manualOnly
+    ? "Manual run mode"
+    : scheduler.enabled
+      ? "Hourly automation armed"
+      : "Manual run mode";
 }
 
 function renderDashboard() {
@@ -313,7 +395,9 @@ async function apiRequest(path, options = {}) {
 
 function buildSavePayload() {
   const payload = new FormData();
-  payload.append("config", JSON.stringify(getConfiguration()));
+  const config = getConfiguration();
+  persistLocalDraft(config);
+  payload.append("config", JSON.stringify(config));
 
   if (resumeInput.files[0]) {
     payload.append("resume", resumeInput.files[0]);
@@ -323,7 +407,9 @@ function buildSavePayload() {
 }
 
 async function persistProfile(showMessage = true) {
-  setBusy(true, "Saving search profile to the backend...");
+  const localConfig = getConfiguration();
+  persistLocalDraft(localConfig);
+  setBusy(true, "Saving search profile...");
 
   try {
     const payload = await apiRequest("/api/config", {
@@ -331,16 +417,22 @@ async function persistProfile(showMessage = true) {
       body: buildSavePayload(),
     });
 
-    state.config = payload.config;
-    state.status = payload.status;
-    applyConfiguration(payload.config);
-    lastSaved.textContent = payload.config.updatedAt
-      ? `Saved ${formatTimestamp(payload.config.updatedAt)}`
-      : "Saved on server";
+    const nextConfig = payload.config || localConfig;
+    state.config = nextConfig;
+    state.status = payload.status || state.status;
+    state.deploymentMode = payload.deploymentMode || state.deploymentMode;
+    applyDeploymentMode(state.deploymentMode);
+    applyConfiguration(nextConfig);
+    persistLocalDraft(nextConfig);
+    lastSaved.textContent = nextConfig.updatedAt
+      ? `Saved ${formatTimestamp(nextConfig.updatedAt)}`
+      : "Saved in browser";
     renderDashboard();
 
     if (showMessage) {
-      feedback.textContent = "Search profile saved to the backend.";
+      feedback.textContent = state.deploymentMode === "manual-only"
+        ? "Search profile saved in this browser. Free deployment mode does not keep server-side files."
+        : "Search profile saved to the backend.";
     }
 
     return payload;
@@ -361,7 +453,8 @@ async function refreshStatus() {
     ]);
 
     state.status = statusPayload.status;
-    state.runs = runsPayload.runs || [];
+    const nextRuns = runsPayload.runs?.length ? runsPayload.runs : loadLocalRuns();
+    state.runs = nextRuns;
     renderStatus(state.status);
     renderRuns(state.runs);
   } catch (error) {
@@ -372,19 +465,41 @@ async function refreshStatus() {
 }
 
 async function bootstrap() {
+  const localDraft = loadLocalDraft();
+  const localRuns = loadLocalRuns();
+
+  if (localDraft) {
+    applyConfiguration(localDraft);
+    lastSaved.textContent = localDraft.updatedAt
+      ? `Draft ${formatTimestamp(localDraft.updatedAt)}`
+      : "Draft loaded from browser";
+  }
+
+  if (localRuns.length) {
+    state.runs = localRuns;
+  }
+
+  renderDashboard();
   setBusy(true, "Connecting to backend...");
 
   try {
     const payload = await apiRequest("/api/bootstrap");
-    state.config = payload.config;
+    state.deploymentMode = payload.deploymentMode || "persistent";
+    applyDeploymentMode(state.deploymentMode);
+
+    const nextConfig = chooseNewestConfig(payload.config, localDraft) || getConfiguration();
+    state.config = nextConfig;
     state.status = payload.status;
-    state.runs = payload.runs || [];
-    applyConfiguration(payload.config);
-    lastSaved.textContent = payload.config.updatedAt
-      ? `Saved ${formatTimestamp(payload.config.updatedAt)}`
-      : "No saved profile yet";
-    feedback.textContent =
-      "Backend connected. Save the profile to store it on disk and trigger runs from the UI.";
+    state.runs = payload.runs?.length ? payload.runs : localRuns;
+    applyConfiguration(nextConfig);
+    persistLocalDraft(nextConfig);
+    persistLocalRuns(state.runs);
+    lastSaved.textContent = nextConfig.updatedAt
+      ? `Saved ${formatTimestamp(nextConfig.updatedAt)}`
+      : "Draft ready";
+    feedback.textContent = state.deploymentMode === "manual-only"
+      ? "Free deployment mode is active. Profiles and recent runs are kept in this browser, and searches run on demand."
+      : "Backend connected. Save the profile to store it on the server and trigger runs from the UI.";
     renderDashboard();
   } catch (error) {
     feedback.textContent = `Backend connection failed: ${error.message}`;
@@ -395,7 +510,15 @@ async function bootstrap() {
   }
 }
 
+function sync() {
+  const config = getConfiguration();
+  persistLocalDraft(config);
+  lastSaved.textContent = "Draft saved in browser";
+  renderDashboard();
+}
+
 timezoneInput.value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+applyDeploymentMode(state.deploymentMode);
 renderDashboard();
 bootstrap();
 setInterval(refreshStatus, 60000);
@@ -407,14 +530,8 @@ resumeInput.addEventListener("change", () => {
   const fileName = resumeInput.files[0]?.name || "";
   resumeInput.dataset.fileName = fileName;
   updateResumeDisplay(fileName);
-  lastSaved.textContent = "Unsaved changes";
-  renderDashboard();
+  sync();
 });
-
-function sync() {
-  lastSaved.textContent = "Unsaved changes";
-  renderDashboard();
-}
 
 saveButton.addEventListener("click", async () => {
   try {
@@ -429,27 +546,31 @@ runButton.addEventListener("click", async () => {
   const missing = validateConfiguration(config);
 
   if (missing.length) {
-    feedback.textContent = `Missing ${missing.join(", ")}. Fill those before running the backend search.`;
+    feedback.textContent = `Missing ${missing.join(", ")}. Fill those before running the search.`;
     statusPill.textContent = "Need required inputs";
     return;
   }
 
+  persistLocalDraft(config);
+
   try {
-    await persistProfile(false);
     setBusy(true, "Starting manual search run...");
     const payload = await apiRequest("/api/run", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ config }),
     });
 
-    state.status = payload.status;
-    state.runs = payload.runs || [];
+    state.status = payload.status || state.status;
+    state.deploymentMode = payload.deploymentMode || state.deploymentMode;
+    applyDeploymentMode(state.deploymentMode);
+    state.runs = payload.runs?.length ? payload.runs : payload.run ? [payload.run] : [];
+    persistLocalRuns(state.runs);
     renderDashboard();
     feedback.textContent =
-      "Manual run completed. The backend recorded the run, but live job retrieval still needs company-specific portal connectors.";
+      "Manual run completed. The app is deployment-ready for free manual-run hosting, but live portal connectors still need to be implemented.";
   } catch (error) {
     feedback.textContent = `Run failed: ${error.message}`;
     statusPill.textContent = "Run failed";
