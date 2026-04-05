@@ -1,5 +1,7 @@
 # JobHunt Control Room
 
+Live Demo: [https://job-search-platform-three.vercel.app/](https://job-search-platform-three.vercel.app/)
+
 Local UI, API, and scheduler for configuring a resume-aware company portal job search.
 
 ## What it does
